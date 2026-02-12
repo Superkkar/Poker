@@ -1534,6 +1534,7 @@
             <div class="summary-players-container">
                 <div id="summaryPlayers"></div>
             </div>
+            <button class="btn btn-primary" onclick="exportJSON()" style="margin-top: 10px; background: linear-gradient(135deg, #4CAF50 0%, #2E7D32 100%);">📄 Export JSON</button>
             <button class="btn btn-primary" onclick="closeSummary()">Chiudi</button>
         </div>
     </div>
@@ -1556,7 +1557,8 @@
             gameLog: [], // Log delle azioni
             initialChips: {}, // Chips iniziali per il riepilogo
             stackHistory: [], // Storia degli stack per i grafici
-            handCount: 0 // Numero di mani giocate
+            handCount: 0, // Numero di mani giocate
+            playerStats: {} // Statistiche avanzate per giocatore
         };
 
         let currentBetPlayer = null;
@@ -1793,6 +1795,19 @@
             // Salva le chips iniziali per il riepilogo
             gameState.players.forEach(p => {
                 gameState.initialChips[p.id] = p.chips;
+                
+                // Inizializza statistiche giocatore
+                gameState.playerStats[p.id] = {
+                    handsPlayed: 0,
+                    foldPreFlop: 0,
+                    foldFlop: 0,
+                    foldTurn: 0,
+                    foldRiver: 0,
+                    showdownWins: 0,
+                    showdownParticipations: 0,
+                    timesBroke: 0,
+                    totalRebuys: 0
+                };
             });
 
             // Salva primo snapshot dello stack
@@ -2066,9 +2081,19 @@
             }
 
             const player = gameState.players[currentRebuyPlayer];
+            const wasBroke = player.chips === 0;
+            
             player.chips += amount;
             player.totalRebuys += amount;
             player.rebuyCount += 1;
+            
+            // Traccia statistiche
+            if (gameState.playerStats[currentRebuyPlayer]) {
+                gameState.playerStats[currentRebuyPlayer].totalRebuys += amount;
+                if (wasBroke) {
+                    gameState.playerStats[currentRebuyPlayer].timesBroke++;
+                }
+            }
             
             addLog(`💰 ${player.name} fa rebuy di ${amount} chips (Totale rebuy: ${player.totalRebuys})`, 'phase');
             
@@ -2169,6 +2194,12 @@
                 const div = document.createElement('div');
                 div.className = `player-summary ${data.isWinner ? 'winner' : data.isLoser ? 'loser' : ''}`;
                 
+                const stats = gameState.playerStats[data.player.id] || {};
+                const foldPreFlopPercent = stats.handsPlayed > 0 ? 
+                    ((stats.foldPreFlop / stats.handsPlayed) * 100).toFixed(1) : 0;
+                const winShowdownPercent = stats.showdownParticipations > 0 ?
+                    ((stats.showdownWins / stats.showdownParticipations) * 100).toFixed(1) : 0;
+                
                 div.innerHTML = `
                     <div class="summary-player-name">
                         ${data.isWinner ? '🏆 ' : ''}${data.player.name}${data.isLoser ? ' 💸' : ''}
@@ -2195,6 +2226,28 @@
                             </div>
                         </div>
                     </div>
+                    <div class="summary-stats" style="margin-top: 10px; border-top: 1px solid rgba(255, 215, 0, 0.2); padding-top: 10px;">
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Mani Giocate</div>
+                            <div>${stats.handsPlayed || 0}</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">% Fold Pre-Flop</div>
+                            <div>${foldPreFlopPercent}%</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">% Win Showdown</div>
+                            <div class="${winShowdownPercent > 50 ? 'profit' : ''}">${winShowdownPercent}%</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Rebuy Totali</div>
+                            <div>${stats.totalRebuys || 0}${formatEuroValue(stats.totalRebuys || 0)}</div>
+                        </div>
+                        <div class="summary-stat">
+                            <div class="summary-stat-label">Volte Broke</div>
+                            <div>${stats.timesBroke || 0}</div>
+                        </div>
+                    </div>
                 `;
                 
                 summaryPlayers.appendChild(div);
@@ -2212,6 +2265,74 @@
 
         function closeSummary() {
             document.getElementById('summaryScreen').style.display = 'none';
+        }
+
+        function exportJSON() {
+            // Prepara i dati per l'export
+            const exportData = {
+                sessionInfo: {
+                    date: new Date().toISOString(),
+                    dateFormatted: new Date().toLocaleString('it-IT'),
+                    totalHands: gameState.handCount,
+                    blindMode: gameState.blindMode,
+                    anteAmount: gameState.anteAmount,
+                    smallBlind: gameState.smallBlind,
+                    bigBlind: gameState.bigBlind,
+                    chipValue: gameState.chipValue
+                },
+                players: gameState.players.map(player => {
+                    const stats = gameState.playerStats[player.id] || {};
+                    const initial = gameState.initialChips[player.id] || 0;
+                    const profit = player.chips - initial;
+                    const profitPercent = initial > 0 ? ((profit / initial) * 100).toFixed(2) : 0;
+                    const foldPreFlopPercent = stats.handsPlayed > 0 ?
+                        ((stats.foldPreFlop / stats.handsPlayed) * 100).toFixed(2) : 0;
+                    const winShowdownPercent = stats.showdownParticipations > 0 ?
+                        ((stats.showdownWins / stats.showdownParticipations) * 100).toFixed(2) : 0;
+                    
+                    return {
+                        name: player.name,
+                        chipsInitial: initial,
+                        chipsFinal: player.chips,
+                        profit: profit,
+                        profitPercent: parseFloat(profitPercent),
+                        profitEuro: gameState.chipValue > 0 ? (profit / gameState.chipValue).toFixed(2) : null,
+                        statistics: {
+                            handsPlayed: stats.handsPlayed || 0,
+                            foldPreFlop: stats.foldPreFlop || 0,
+                            foldPreFlopPercent: parseFloat(foldPreFlopPercent),
+                            foldFlop: stats.foldFlop || 0,
+                            foldTurn: stats.foldTurn || 0,
+                            foldRiver: stats.foldRiver || 0,
+                            showdownWins: stats.showdownWins || 0,
+                            showdownParticipations: stats.showdownParticipations || 0,
+                            winShowdownPercent: parseFloat(winShowdownPercent),
+                            totalRebuys: stats.totalRebuys || 0,
+                            rebuyCount: player.rebuyCount || 0,
+                            timesBroke: stats.timesBroke || 0
+                        }
+                    };
+                }),
+                stackHistory: gameState.stackHistory
+            };
+            
+            // Crea il blob JSON
+            const jsonString = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Crea link per download
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+            a.download = `poker_session_${timestamp}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            hapticFeedback('success');
+            alert('Export JSON completato! Il file è stato scaricato.');
         }
 
         function saveStackSnapshot() {
@@ -2682,6 +2803,19 @@
             player.folded = true;
             player.hasActed = true;
 
+            // Traccia statistiche fold per fase
+            if (gameState.playerStats[playerId]) {
+                if (gameState.phase === 'Pre-Flop') {
+                    gameState.playerStats[playerId].foldPreFlop++;
+                } else if (gameState.phase === 'Flop') {
+                    gameState.playerStats[playerId].foldFlop++;
+                } else if (gameState.phase === 'Turn') {
+                    gameState.playerStats[playerId].foldTurn++;
+                } else if (gameState.phase === 'River') {
+                    gameState.playerStats[playerId].foldRiver++;
+                }
+            }
+
             // Log
             addLog(`${player.name} folda`, 'fold');
 
@@ -3004,6 +3138,14 @@
             
             // Incrementa contatore mani e salva snapshot
             gameState.handCount++;
+            
+            // Incrementa handsPlayed per tutti i giocatori
+            gameState.players.forEach(p => {
+                if (gameState.playerStats[p.id]) {
+                    gameState.playerStats[p.id].handsPlayed++;
+                }
+            });
+            
             saveStackSnapshot();
             
             // Log
@@ -3106,6 +3248,20 @@
             const player = gameState.players[playerId];
             const potAmount = gameState.pot;
             player.chips += potAmount;
+            
+            // Traccia vittoria showdown se siamo allo showdown
+            if (gameState.phase === 'Showdown' && gameState.playerStats[playerId]) {
+                gameState.playerStats[playerId].showdownWins++;
+            }
+            
+            // Traccia partecipazione showdown per tutti i non-foldati
+            if (gameState.phase === 'Showdown') {
+                gameState.players.forEach(p => {
+                    if (!p.folded && gameState.playerStats[p.id]) {
+                        gameState.playerStats[p.id].showdownParticipations++;
+                    }
+                });
+            }
             
             // Log
             addLog(`🏆 ${player.name} vince il piatto: ${potAmount} chips`, 'win');
