@@ -339,6 +339,26 @@
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
         }
 
+        .blind-badge {
+            position: absolute;
+            top: -8px;
+            left: -8px;
+            background: #4CAF50;
+            color: #fff;
+            padding: 3px 6px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 10px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .blind-badge.big {
+            background: #f44336;
+        }
+
         .player-name {
             font-weight: bold;
             font-size: 16px;
@@ -1259,6 +1279,39 @@
             </div>
 
             <div class="setup-group">
+                <label style="margin-bottom: 10px; display: block;">💰 Modalità Puntate</label>
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                        <input type="radio" name="blindMode" value="ante" id="modeAnte" checked onchange="toggleBlindMode()" style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #ffd700; font-size: 16px;">Ante</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                        <input type="radio" name="blindMode" value="blinds" id="modeBlinds" onchange="toggleBlindMode()" style="width: 18px; height: 18px; cursor: pointer;">
+                        <span style="color: #ffd700; font-size: 16px;">Small & Big Blind</span>
+                    </label>
+                </div>
+                
+                <div id="anteGroup">
+                    <label for="anteAmount" style="font-size: 14px; color: #aaa;">Importo Ante (tutti pagano)</label>
+                    <input type="number" id="anteAmount" value="0" min="0" step="5" style="width: 100%; padding: 10px; border: 2px solid #ffd700; border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 16px; margin-top: 5px;">
+                    <small style="color: #888; font-size: 11px; display: block; margin-top: 3px;">0 = nessuna ante</small>
+                </div>
+                
+                <div id="blindsGroup" style="display: none;">
+                    <div style="margin-bottom: 10px;">
+                        <label for="smallBlind" style="font-size: 14px; color: #aaa;">Small Blind (SB)</label>
+                        <input type="number" id="smallBlind" value="5" min="1" step="5" style="width: 100%; padding: 10px; border: 2px solid #ffd700; border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 16px; margin-top: 5px;">
+                        <small style="color: #888; font-size: 11px; display: block; margin-top: 3px;">Giocatore dopo il dealer</small>
+                    </div>
+                    <div>
+                        <label for="bigBlind" style="font-size: 14px; color: #aaa;">Big Blind (BB)</label>
+                        <input type="number" id="bigBlind" value="10" min="1" step="5" style="width: 100%; padding: 10px; border: 2px solid #ffd700; border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 16px; margin-top: 5px;">
+                        <small style="color: #888; font-size: 11px; display: block; margin-top: 3px;">Due giocatori dopo il dealer</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-group">
                 <label for="initialDealer">🅓 Dealer iniziale</label>
                 <select id="initialDealer" style="width: 100%; padding: 10px; border: 2px solid #ffd700; border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 16px;">
                     <!-- Popolato dinamicamente -->
@@ -1492,7 +1545,10 @@
             pot: 0,
             phase: 'Pre-Flop',
             dealerIndex: 0,
+            blindMode: 'ante', // 'ante' o 'blinds'
             anteAmount: 0,
+            smallBlind: 0,
+            bigBlind: 0,
             chipValue: 0, // Quante chips per 1 euro (0 = disabilitato)
             currentBets: {},
             currentCall: 0,
@@ -1564,6 +1620,12 @@
             document.getElementById('chipsLabel').style.display = sameForAll ? 'none' : 'inline';
             updatePlayerInputs();
             updateTablePreview();
+        }
+
+        function toggleBlindMode() {
+            const modeAnte = document.getElementById('modeAnte').checked;
+            document.getElementById('anteGroup').style.display = modeAnte ? 'block' : 'none';
+            document.getElementById('blindsGroup').style.display = modeAnte ? 'none' : 'block';
         }
 
         function updatePlayerInputs() {
@@ -1670,9 +1732,14 @@
             const numPlayers = parseInt(document.getElementById('numPlayers').value);
             const sameForAll = document.getElementById('sameChipsForAll').checked;
             const globalChips = parseInt(document.getElementById('startingChips').value);
-            const anteAmount = parseInt(document.getElementById('anteAmount').value);
             const chipValue = parseInt(document.getElementById('chipValue').value) || 0;
             const initialDealer = parseInt(document.getElementById('initialDealer').value) || 0;
+            
+            // Leggi modalità blinds
+            const blindMode = document.querySelector('input[name="blindMode"]:checked').value;
+            const anteAmount = blindMode === 'ante' ? parseInt(document.getElementById('anteAmount').value) || 0 : 0;
+            const smallBlind = blindMode === 'blinds' ? parseInt(document.getElementById('smallBlind').value) || 0 : 0;
+            const bigBlind = blindMode === 'blinds' ? parseInt(document.getElementById('bigBlind').value) || 0 : 0;
 
             if (sameForAll && globalChips < 100) {
                 alert('Le chips iniziali devono essere almeno 100');
@@ -1707,7 +1774,10 @@
                 });
             }
 
+            gameState.blindMode = blindMode;
             gameState.anteAmount = anteAmount;
+            gameState.smallBlind = smallBlind;
+            gameState.bigBlind = bigBlind;
             gameState.chipValue = chipValue;
             gameState.dealerIndex = initialDealer; // Usa il dealer selezionato
             gameState.pot = 0;
@@ -1730,17 +1800,42 @@
 
             addLog(`🎮 Partita iniziata con ${numPlayers} giocatori`, 'phase');
 
-            // Apply ante if set - all'inizio del gioco
-            if (gameState.anteAmount > 0) {
+            // Apply ante or blinds - all'inizio del gioco
+            if (gameState.blindMode === 'ante' && gameState.anteAmount > 0) {
+                // Modalità Ante: tutti pagano
                 gameState.players.forEach(player => {
                     if (player.chips >= gameState.anteAmount) {
                         player.chips -= gameState.anteAmount;
-                        player.bet = gameState.anteAmount; // L'ante diventa la puntata iniziale
+                        player.bet = gameState.anteAmount;
                         gameState.pot += gameState.anteAmount;
                     }
                 });
-                // Imposta currentCall all'importo dell'ante
                 gameState.currentCall = gameState.anteAmount;
+                addLog(`💰 Ante: ${gameState.anteAmount} chips per giocatore`, 'phase');
+            } else if (gameState.blindMode === 'blinds') {
+                // Modalità Blinds: solo SB e BB pagano
+                const sbIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+                const bbIndex = (gameState.dealerIndex + 2) % gameState.players.length;
+                
+                // Small Blind
+                const sbPlayer = gameState.players[sbIndex];
+                if (sbPlayer.chips >= gameState.smallBlind) {
+                    sbPlayer.chips -= gameState.smallBlind;
+                    sbPlayer.bet = gameState.smallBlind;
+                    gameState.pot += gameState.smallBlind;
+                }
+                
+                // Big Blind
+                const bbPlayer = gameState.players[bbIndex];
+                if (bbPlayer.chips >= gameState.bigBlind) {
+                    bbPlayer.chips -= gameState.bigBlind;
+                    bbPlayer.bet = gameState.bigBlind;
+                    gameState.pot += gameState.bigBlind;
+                }
+                
+                gameState.currentCall = gameState.bigBlind;
+                addLog(`💰 Small Blind (${sbPlayer.name}): ${gameState.smallBlind} chips`, 'phase');
+                addLog(`💰 Big Blind (${bbPlayer.name}): ${gameState.bigBlind} chips`, 'phase');
             }
 
             document.getElementById('setupScreen').style.display = 'none';
@@ -2271,6 +2366,8 @@
 
             gameState.players.forEach((player, index) => {
                 const isDealer = index === gameState.dealerIndex;
+                const isSmallBlind = gameState.blindMode === 'blinds' && index === (gameState.dealerIndex + 1) % gameState.players.length;
+                const isBigBlind = gameState.blindMode === 'blinds' && index === (gameState.dealerIndex + 2) % gameState.players.length;
                 const hasBet = player.bet > 0;
                 const isFolded = player.folded;
                 const hasChecked = player.hasChecked;
@@ -2295,6 +2392,8 @@
                 
                 card.innerHTML = `
                     ${isDealer ? '<div class="dealer-badge">D</div>' : ''}
+                    ${isSmallBlind ? '<div class="blind-badge">SB</div>' : ''}
+                    ${isBigBlind ? '<div class="blind-badge big">BB</div>' : ''}
                     ${isFolded ? '<div class="fold-badge">FOLD</div>' : ''}
                     ${hasChecked && !isFolded ? '<div class="check-badge">✓ CHECK</div>' : ''}
                     <div class="player-name">${player.name}</div>
@@ -2862,17 +2961,41 @@
             gameState.history = [];
             gameState.pot = 0; // Reset del piatto
 
-            // Apply ante if set - DOPO aver resettato tutto
-            if (gameState.anteAmount > 0) {
+            // Apply ante or blinds - DOPO aver resettato tutto
+            if (gameState.blindMode === 'ante' && gameState.anteAmount > 0) {
+                // Modalità Ante: tutti pagano
                 gameState.players.forEach(player => {
                     if (player.chips >= gameState.anteAmount) {
                         player.chips -= gameState.anteAmount;
-                        player.bet = gameState.anteAmount; // L'ante diventa la puntata iniziale
+                        player.bet = gameState.anteAmount;
                         gameState.pot += gameState.anteAmount;
                     }
                 });
-                // Imposta currentCall all'importo dell'ante
                 gameState.currentCall = gameState.anteAmount;
+            } else if (gameState.blindMode === 'blinds') {
+                // Modalità Blinds: solo SB e BB pagano
+                const sbIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+                const bbIndex = (gameState.dealerIndex + 2) % gameState.players.length;
+                
+                // Small Blind
+                const sbPlayer = gameState.players[sbIndex];
+                if (sbPlayer.chips >= gameState.smallBlind) {
+                    sbPlayer.chips -= gameState.smallBlind;
+                    sbPlayer.bet = gameState.smallBlind;
+                    gameState.pot += gameState.smallBlind;
+                }
+                
+                // Big Blind
+                const bbPlayer = gameState.players[bbIndex];
+                if (bbPlayer.chips >= gameState.bigBlind) {
+                    bbPlayer.chips -= gameState.bigBlind;
+                    bbPlayer.bet = gameState.bigBlind;
+                    gameState.pot += gameState.bigBlind;
+                }
+                
+                gameState.currentCall = gameState.bigBlind;
+                addLog(`💰 Small Blind (${sbPlayer.name}): ${gameState.smallBlind} chips`, 'phase');
+                addLog(`💰 Big Blind (${bbPlayer.name}): ${gameState.bigBlind} chips`, 'phase');
             }
 
             renderGame();
