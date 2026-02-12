@@ -1390,6 +1390,11 @@
                     <div id="rebuyManagementList" style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;"></div>
                 </div>
 
+                <div class="setting-item" style="margin-top: 20px; padding: 15px; background: rgba(255, 215, 0, 0.1); border-radius: 8px; border: 2px solid rgba(255, 215, 0, 0.3);">
+                    <label class="setting-label" style="color: #ffd700; margin-bottom: 10px; display: block;">📊 Totale Chips in Gioco</label>
+                    <div id="totalChipsDisplay" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                </div>
+
                 <button class="btn btn-primary" onclick="applySettings()">Applica Modifiche</button>
                 <button class="btn-modal btn-modal-cancel" style="width: 100%; margin-top: 10px;" onclick="closeSettings()">Chiudi</button>
                 <button class="btn-phase btn-danger" style="width: 100%; margin-top: 15px; padding: 12px;" onclick="if(confirm('Cancellare tutti i dati salvati? Questa azione non può essere annullata.')) { clearSavedGame(); alert('Dati cancellati!'); }">🗑️ Cancella Salvataggio</button>
@@ -3049,6 +3054,48 @@
                 
                 container.appendChild(div);
             });
+            
+            // Aggiorna anche il totale chips
+            updateTotalChipsDisplay();
+        }
+
+        function updateTotalChipsDisplay() {
+            const container = document.getElementById('totalChipsDisplay');
+            if (!container) return;
+            
+            // Calcola chips totali dei giocatori
+            const totalPlayerChips = gameState.players.reduce((sum, player) => sum + player.chips, 0);
+            
+            // Aggiungi il piatto
+            const pot = gameState.pot || 0;
+            
+            // Totale generale
+            const grandTotal = totalPlayerChips + pot;
+            
+            // Formatta con valori in euro se configurato
+            const formatWithEuro = (chips) => {
+                let text = chips.toString();
+                if (gameState.chipValue > 0) {
+                    const euros = (chips / gameState.chipValue).toFixed(2);
+                    text += ` <span style="color: #aaa; font-size: 13px;">(${euros}€)</span>`;
+                }
+                return text;
+            };
+            
+            container.innerHTML = `
+                <div style="display: flex; justify-content: space-between; padding: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 4px;">
+                    <span style="color: #fff;">Chips Giocatori:</span>
+                    <span style="color: #4CAF50; font-weight: bold;">${formatWithEuro(totalPlayerChips)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 4px;">
+                    <span style="color: #fff;">Piatto:</span>
+                    <span style="color: #FFC107; font-weight: bold;">${formatWithEuro(pot)}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px; background: rgba(255, 215, 0, 0.2); border-radius: 4px; border: 1px solid #ffd700;">
+                    <span style="color: #ffd700; font-weight: bold;">TOTALE:</span>
+                    <span style="color: #ffd700; font-weight: bold; font-size: 18px;">${formatWithEuro(grandTotal)}</span>
+                </div>
+            `;
         }
 
         function openRebuyFromSettings(playerId) {
