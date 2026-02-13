@@ -801,6 +801,54 @@
             display: none !important;
         }
 
+        /* Indicatore Fase Fisso Mobile */
+        .phase-indicator-mobile {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(10, 77, 10, 0.98) 0%, rgba(10, 77, 10, 0.95) 100%);
+            padding: 12px 20px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+            border-top: 3px solid #ffd700;
+            z-index: 1000;
+            text-align: center;
+        }
+
+        .phase-indicator-mobile.ready {
+            border-top-color: #4CAF50;
+            background: linear-gradient(to top, rgba(76, 175, 80, 0.3) 0%, rgba(10, 77, 10, 0.95) 100%);
+        }
+
+        .phase-indicator-text {
+            color: #fff;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .phase-indicator-status {
+            color: #ffd700;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .phase-indicator-mobile.ready .phase-indicator-status {
+            color: #4CAF50;
+        }
+
+        @media (max-width: 768px) {
+            .phase-indicator-mobile {
+                display: block;
+            }
+            
+            /* Aggiungi padding bottom al gioco per evitare che l'indicatore copra contenuto */
+            .players-grid {
+                padding-bottom: 80px;
+            }
+        }
+
         /* Visualizzazione Tavolo */
         .table-preview {
             margin: 25px 0;
@@ -1263,6 +1311,11 @@
             </div>
 
             <div class="setup-group">
+                <label for="anteAmount">Ante per mano (0 = disabilitato)</label>
+                <input type="number" id="anteAmount" value="0" min="0" step="5">
+            </div>
+
+            <div class="setup-group">
                 <label for="chipValue">Valore di scambio (0 = disabilitato)</label>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" id="chipValue" value="0" min="0" step="50" style="flex: 1;" placeholder="es. 500">
@@ -1344,6 +1397,12 @@
             </div>
 
             <div class="players-grid" id="playersGrid"></div>
+
+            <!-- Indicatore Fase Mobile Fisso -->
+            <div class="phase-indicator-mobile" id="phaseIndicatorMobile">
+                <div class="phase-indicator-text">Stato Fase</div>
+                <div class="phase-indicator-status" id="phaseIndicatorStatus">In Attesa...</div>
+            </div>
 
             <div class="phase-controls">
                 <div class="phase-buttons">
@@ -2939,40 +2998,63 @@
             // Esclude giocatori foldati E giocatori senza chips (broke)
             const activePlayers = gameState.players.filter(p => !p.folded && p.chips > 0);
             
+            let isReady = false;
+            let statusText = '';
+            
             if (activePlayers.length === 0) {
                 // Tutti i giocatori sono all-in o foldati - la fase è pronta
-                document.getElementById('phaseName').style.color = '#4CAF50';
-                return;
-            }
-
-            // Se c'è un solo giocatore attivo con chips (gli altri sono all-in o foldati)
-            if (activePlayers.length === 1) {
+                isReady = true;
+                statusText = '✅ Tutti All-In - Pronto!';
+            } else if (activePlayers.length === 1) {
+                // Se c'è un solo giocatore attivo con chips (gli altri sono all-in o foldati)
                 const player = activePlayers[0];
                 const allNonFoldedPlayers = gameState.players.filter(p => !p.folded);
                 const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet));
                 
                 // Il giocatore deve aver agito E pareggiato la puntata massima
                 if (player.hasActed && player.bet === maxBet) {
-                    document.getElementById('phaseName').style.color = '#4CAF50';
-                    return;
+                    isReady = true;
+                    statusText = '✅ Pronto per la Prossima Fase!';
+                } else {
+                    statusText = `⏳ ${player.name} deve agire`;
+                }
+            } else {
+                // Trova la puntata massima tra TUTTI i giocatori non foldati (inclusi all-in)
+                const allNonFoldedPlayers = gameState.players.filter(p => !p.folded);
+                const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet));
+                
+                // Tutti devono aver agito
+                const allActed = activePlayers.every(p => p.hasActed);
+                
+                // Tutti i giocatori attivi devono aver puntato la puntata massima
+                const allMatched = activePlayers.every(p => p.bet === maxBet);
+
+                if (allActed && allMatched) {
+                    // Tutti hanno agito e pareggiato - abilita prossima fase
+                    isReady = true;
+                    statusText = '✅ Pronto per la Prossima Fase!';
+                } else if (!allActed) {
+                    const notActed = activePlayers.filter(p => !p.hasActed);
+                    statusText = `⏳ ${notActed.length} giocator${notActed.length > 1 ? 'i' : 'e'} deve agire`;
+                } else {
+                    statusText = `⏳ Puntate da pareggiare (${maxBet})`;
                 }
             }
-
-            // Trova la puntata massima tra TUTTI i giocatori non foldati (inclusi all-in)
-            const allNonFoldedPlayers = gameState.players.filter(p => !p.folded);
-            const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet));
             
-            // Tutti devono aver agito
-            const allActed = activePlayers.every(p => p.hasActed);
+            // Aggiorna colore fase principale
+            document.getElementById('phaseName').style.color = isReady ? '#4CAF50' : '#fff';
             
-            // Tutti i giocatori attivi devono aver puntato la puntata massima
-            const allMatched = activePlayers.every(p => p.bet === maxBet);
-
-            if (allActed && allMatched) {
-                // Tutti hanno agito e pareggiato - abilita prossima fase
-                document.getElementById('phaseName').style.color = '#4CAF50';
-            } else {
-                document.getElementById('phaseName').style.color = '#fff';
+            // Aggiorna indicatore mobile
+            const mobileIndicator = document.getElementById('phaseIndicatorMobile');
+            const statusElement = document.getElementById('phaseIndicatorStatus');
+            
+            if (mobileIndicator && statusElement) {
+                if (isReady) {
+                    mobileIndicator.classList.add('ready');
+                } else {
+                    mobileIndicator.classList.remove('ready');
+                }
+                statusElement.textContent = statusText;
             }
         }
 
@@ -3048,6 +3130,15 @@
                 renderGame();
                 // Reset del colore della fase a bianco
                 document.getElementById('phaseName').style.color = '#fff';
+                
+                // Reset indicatore mobile
+                const mobileIndicator = document.getElementById('phaseIndicatorMobile');
+                const statusElement = document.getElementById('phaseIndicatorStatus');
+                if (mobileIndicator && statusElement) {
+                    mobileIndicator.classList.remove('ready');
+                    statusElement.textContent = '⏳ In Attesa...';
+                }
+                
                 saveGame();
                 hapticFeedback('medium');
                 playSound('phase');
@@ -3130,6 +3221,14 @@
             renderGame();
             // Reset del colore della fase a bianco
             document.getElementById('phaseName').style.color = '#fff';
+            
+            // Reset indicatore mobile
+            const mobileIndicator = document.getElementById('phaseIndicatorMobile');
+            const statusElement = document.getElementById('phaseIndicatorStatus');
+            if (mobileIndicator && statusElement) {
+                mobileIndicator.classList.remove('ready');
+                statusElement.textContent = '⏳ In Attesa...';
+            }
             
             // Incrementa contatore mani e salva snapshot
             gameState.handCount++;
