@@ -3679,8 +3679,12 @@
 
         function checkPhaseReady() {
             // Controlla se tutti i giocatori attivi hanno agito e pareggiato la puntata
-            // Esclude giocatori foldati E giocatori senza chips (broke)
+            // Giocatori attivi = hanno chips E non hanno foldato
             const activePlayers = gameState.players.filter(p => !p.folded && p.chips > 0);
+            // Giocatori all-in = non foldati E chips = 0
+            const allInPlayers = gameState.players.filter(p => !p.folded && p.chips === 0);
+            // Tutti i non foldati
+            const allNonFoldedPlayers = gameState.players.filter(p => !p.folded);
             
             let isReady = false;
             let statusText = '';
@@ -3690,27 +3694,29 @@
                 isReady = true;
                 statusText = '✅ Tutti All-In - Pronto!';
             } else if (activePlayers.length === 1) {
-                // Se c'è un solo giocatore attivo con chips (gli altri sono all-in o foldati)
+                // Un solo giocatore attivo con chips
                 const player = activePlayers[0];
-                const allNonFoldedPlayers = gameState.players.filter(p => !p.folded);
-                const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet));
+                const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet), 0);
                 
                 // Il giocatore deve aver agito E pareggiato la puntata massima
                 if (player.hasActed && player.bet === maxBet) {
                     isReady = true;
                     statusText = '✅ Pronto per la Prossima Fase!';
+                } else if (player.bet < maxBet) {
+                    statusText = `⏳ ${player.name} deve chiamare ${maxBet}`;
                 } else {
                     statusText = `⏳ ${player.name} deve agire`;
                 }
             } else {
-                // Trova la puntata massima tra TUTTI i giocatori non foldati (inclusi all-in)
-                const allNonFoldedPlayers = gameState.players.filter(p => !p.folded);
-                const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet));
+                // Più giocatori attivi
+                // Trova la puntata massima tra TUTTI i non foldati (inclusi all-in)
+                const maxBet = Math.max(...allNonFoldedPlayers.map(p => p.bet), 0);
                 
-                // Tutti devono aver agito
+                // Tutti i giocatori attivi devono aver agito
                 const allActed = activePlayers.every(p => p.hasActed);
                 
-                // Tutti i giocatori attivi devono aver puntato la puntata massima
+                // CRITICAL FIX: Tutti i giocatori attivi devono aver pareggiato il maxBet
+                // (anche se c'è qualcuno all-in che ha puntato di più)
                 const allMatched = activePlayers.every(p => p.bet === maxBet);
 
                 if (allActed && allMatched) {
@@ -3721,7 +3727,9 @@
                     const notActed = activePlayers.filter(p => !p.hasActed);
                     statusText = `⏳ ${notActed.length} giocator${notActed.length > 1 ? 'i' : 'e'} deve agire`;
                 } else {
-                    statusText = `⏳ Puntate da pareggiare (${maxBet})`;
+                    // Hanno agito ma non hanno pareggiato
+                    const notMatched = activePlayers.filter(p => p.bet < maxBet);
+                    statusText = `⏳ ${notMatched.length} giocator${notMatched.length > 1 ? 'i' : 'e'} deve pareggiare (${maxBet})`;
                 }
             }
             
@@ -3790,7 +3798,9 @@
                 }
 
                 if (!allMatched) {
-                    alert('Non tutti i giocatori hanno pareggiato la puntata massima!');
+                    const notMatchedPlayers = activePlayers.filter(p => p.bet < maxBet);
+                    const playerNames = notMatchedPlayers.map(p => p.name).join(', ');
+                    alert(`${playerNames} deve/devono pareggiare la puntata massima di ${maxBet} chips!`);
                     hapticFeedback('error');
                     return;
                 }
