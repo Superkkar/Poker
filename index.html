@@ -1311,11 +1311,6 @@
             </div>
 
             <div class="setup-group">
-                <label for="anteAmount">Ante per mano (0 = disabilitato)</label>
-                <input type="number" id="anteAmount" value="0" min="0" step="5">
-            </div>
-
-            <div class="setup-group">
                 <label for="chipValue">Valore di scambio (0 = disabilitato)</label>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="number" id="chipValue" value="0" min="0" step="50" style="flex: 1;" placeholder="es. 500">
@@ -1366,6 +1361,16 @@
                 </select>
             </div>
 
+            <div class="setup-group" style="border: 2px solid #f44336; border-radius: 8px; padding: 15px; background: rgba(244, 67, 54, 0.1);">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;">
+                    <input type="checkbox" id="developerMode" onchange="toggleDeveloperMode()" style="width: 20px; height: 20px; cursor: pointer;">
+                    <span style="color: #f44336; font-size: 16px; font-weight: bold;">🔧 Developer Mode</span>
+                </label>
+                <small style="color: #f44336; font-size: 12px; display: block; margin-top: 5px;">
+                    Abilita strumenti di test rapido e automazione (richiede PIN)
+                </small>
+            </div>
+
             <button class="btn btn-primary" onclick="startGame()">Inizia Partita</button>
         </div>
 
@@ -1402,6 +1407,37 @@
             <div class="phase-indicator-mobile" id="phaseIndicatorMobile">
                 <div class="phase-indicator-text">Stato Fase</div>
                 <div class="phase-indicator-status" id="phaseIndicatorStatus">In Attesa...</div>
+            </div>
+
+            <!-- Developer Tools -->
+            <div id="devTools" style="display: none; background: rgba(244, 67, 54, 0.2); border: 2px solid #f44336; border-radius: 12px; padding: 15px; margin-bottom: 15px;">
+                <div style="color: #f44336; font-weight: bold; font-size: 16px; margin-bottom: 10px; text-align: center;">
+                    🔧 Developer Tools
+                </div>
+                
+                <!-- Simulazione Mani Personalizzata -->
+                <div style="background: rgba(0, 0, 0, 0.3); padding: 10px; border-radius: 6px; margin-bottom: 10px;">
+                    <label style="color: #f44336; font-size: 13px; display: block; margin-bottom: 5px;">⚡ Simula Mani:</label>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="number" id="devHandsCount" value="10" min="1" max="100" style="flex: 1; padding: 8px; border: 2px solid #f44336; border-radius: 4px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 14px; text-align: center;">
+                        <button class="btn-phase" style="font-size: 13px; padding: 8px 15px; white-space: nowrap;" onclick="devSimulateCustomHands()">▶️ Avvia</button>
+                    </div>
+                    <small style="color: #f44336; font-size: 11px; display: block; margin-top: 5px; text-align: center;">
+                        Inserisci un numero tra 1 e 100
+                    </small>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 10px;">
+                    <button class="btn-phase" style="font-size: 12px; padding: 8px;" onclick="devAutoPlay()">▶️ Auto Play</button>
+                    <button class="btn-phase" style="font-size: 12px; padding: 8px;" onclick="devRandomWinner()">🎲 Winner Random</button>
+                    <button class="btn-phase" style="font-size: 12px; padding: 8px;" onclick="devFillStats()">📊 Riempi Stats</button>
+                    <button class="btn-phase" style="font-size: 12px; padding: 8px;" onclick="devAddChips()">💰 +1000 Tutti</button>
+                    <button class="btn-phase" style="font-size: 12px; padding: 8px;" onclick="devNextPhaseForce()">⏭️ Salta Fase</button>
+                    <button class="btn-phase" style="font-size: 12px; padding: 8px;" onclick="devStopSimulation()">⏹️ Stop</button>
+                </div>
+                <div style="font-size: 11px; color: #f44336; text-align: center;">
+                    Hand: <span id="devHandCount">0</span> | Actions: <span id="devActionCount">0</span> | <span id="devStatus">Idle</span>
+                </div>
             </div>
 
             <div class="phase-controls">
@@ -1504,8 +1540,18 @@
 
                 <button class="btn btn-primary" onclick="applySettings()">Applica Modifiche</button>
                 <button class="btn-modal btn-modal-cancel" style="width: 100%; margin-top: 10px;" onclick="closeSettings()">Chiudi</button>
+                <button class="btn-phase" style="width: 100%; margin-top: 15px; padding: 12px; background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);" onclick="showPlayerProfiles()">🎯 Profili Giocatori</button>
                 <button class="btn-phase btn-danger" style="width: 100%; margin-top: 15px; padding: 12px;" onclick="if(confirm('Cancellare tutti i dati salvati? Questa azione non può essere annullata.')) { clearSavedGame(); alert('Dati cancellati!'); }">🗑️ Cancella Salvataggio</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Player Profiles Modal -->
+    <div class="modal" id="profilesModal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">🎯 Profili Giocatori</div>
+            <div id="profilesContent" style="max-height: 60vh; overflow-y: auto;"></div>
+            <button class="btn-modal btn-modal-cancel" onclick="closeProfilesModal()">Chiudi</button>
         </div>
     </div>
 
@@ -1612,7 +1658,8 @@
             initialChips: {}, // Chips iniziali per il riepilogo
             stackHistory: [], // Storia degli stack per i grafici
             handCount: 0, // Numero di mani giocate
-            playerStats: {} // Statistiche avanzate per giocatore
+            playerStats: {}, // Statistiche avanzate per giocatore
+            developerMode: false // Modalità developer
         };
 
         let currentBetPlayer = null;
@@ -1682,6 +1729,26 @@
             const modeAnte = document.getElementById('modeAnte').checked;
             document.getElementById('anteGroup').style.display = modeAnte ? 'block' : 'none';
             document.getElementById('blindsGroup').style.display = modeAnte ? 'none' : 'block';
+        }
+
+        const DEVELOPER_PIN = '1234'; // Cambia questo PIN per sicurezza
+
+        function toggleDeveloperMode() {
+            const checkbox = document.getElementById('developerMode');
+            
+            if (checkbox.checked) {
+                // Richiedi PIN
+                const enteredPin = prompt('🔒 Inserisci PIN Developer Mode:');
+                
+                if (enteredPin === DEVELOPER_PIN) {
+                    alert('✅ Developer Mode attivato!');
+                } else {
+                    alert('❌ PIN errato! Developer Mode non attivato.');
+                    checkbox.checked = false;
+                }
+            } else {
+                alert('Developer Mode disattivato.');
+            }
         }
 
         function updatePlayerInputs() {
@@ -1790,6 +1857,7 @@
             const globalChips = parseInt(document.getElementById('startingChips').value);
             const chipValue = parseInt(document.getElementById('chipValue').value) || 0;
             const initialDealer = parseInt(document.getElementById('initialDealer').value) || 0;
+            const developerMode = document.getElementById('developerMode').checked;
             
             // Leggi modalità blinds
             const blindMode = document.querySelector('input[name="blindMode"]:checked').value;
@@ -1835,6 +1903,7 @@
             gameState.smallBlind = smallBlind;
             gameState.bigBlind = bigBlind;
             gameState.chipValue = chipValue;
+            gameState.developerMode = developerMode;
             gameState.dealerIndex = initialDealer; // Usa il dealer selezionato
             gameState.pot = 0;
             gameState.phase = 'Pre-Flop';
@@ -1860,7 +1929,21 @@
                     showdownWins: 0,
                     showdownParticipations: 0,
                     timesBroke: 0,
-                    totalRebuys: 0
+                    totalRebuys: 0,
+                    // Pattern di gioco
+                    totalRaises: 0,
+                    raisePreFlop: 0,
+                    raiseFlop: 0,
+                    raiseTurn: 0,
+                    raiseRiver: 0,
+                    totalCalls: 0,
+                    totalChecks: 0,
+                    totalAllIns: 0,
+                    aggressivePlays: 0, // Raise/Reraise consecutivi
+                    passivePlays: 0,    // Check/Call consecutivi
+                    bigPotWins: 0,      // Vittorie con piatti > media
+                    bigPotLosses: 0,    // Perdite con piatti > media
+                    lastActions: []     // Ultime 10 azioni per pattern
                 };
             });
 
@@ -1922,6 +2005,7 @@
             updateGameHeader();
             updateUndoButton();
             updateGameLog();
+            showDevTools();
         }
 
         function addLog(message, type = 'normal') {
@@ -2344,6 +2428,9 @@
                     const winShowdownPercent = stats.showdownParticipations > 0 ?
                         ((stats.showdownWins / stats.showdownParticipations) * 100).toFixed(2) : 0;
                     
+                    // Genera profilo giocatore
+                    const profile = generatePlayerProfile(player.id);
+                    
                     return {
                         name: player.name,
                         chipsInitial: initial,
@@ -2363,8 +2450,14 @@
                             winShowdownPercent: parseFloat(winShowdownPercent),
                             totalRebuys: stats.totalRebuys || 0,
                             rebuyCount: player.rebuyCount || 0,
-                            timesBroke: stats.timesBroke || 0
-                        }
+                            timesBroke: stats.timesBroke || 0,
+                            // Pattern di gioco
+                            totalRaises: stats.totalRaises || 0,
+                            totalCalls: stats.totalCalls || 0,
+                            totalChecks: stats.totalChecks || 0,
+                            totalAllIns: stats.totalAllIns || 0
+                        },
+                        profile: profile
                     };
                 }),
                 stackHistory: gameState.stackHistory
@@ -2387,6 +2480,566 @@
             
             hapticFeedback('success');
             alert('Export JSON completato! Il file è stato scaricato.');
+        }
+
+        // ===== ANALISI PATTERN DI GIOCO =====
+        
+        function trackPlayerAction(playerId, action, amount) {
+            if (!gameState.playerStats[playerId]) return;
+            
+            const stats = gameState.playerStats[playerId];
+            const actionData = {
+                action: action,
+                amount: amount,
+                phase: gameState.phase,
+                pot: gameState.pot,
+                timestamp: Date.now()
+            };
+            
+            // Mantieni solo le ultime 20 azioni
+            if (!stats.lastActions) stats.lastActions = [];
+            stats.lastActions.push(actionData);
+            if (stats.lastActions.length > 20) {
+                stats.lastActions.shift();
+            }
+            
+            // Analizza pattern aggressività/passività
+            analyzePlayPattern(playerId);
+        }
+
+        function analyzePlayPattern(playerId) {
+            const stats = gameState.playerStats[playerId];
+            if (!stats || !stats.lastActions || stats.lastActions.length < 2) return;
+            
+            const recentActions = stats.lastActions.slice(-5); // Ultime 5 azioni
+            
+            // Pattern aggressivo: raise/allin consecutivi o frequenti
+            const aggressiveActions = recentActions.filter(a => a.action === 'raise' || a.action === 'allin');
+            if (aggressiveActions.length >= 3) {
+                stats.aggressivePlays++;
+            }
+            
+            // Pattern passivo: check/call consecutivi
+            const passiveActions = recentActions.filter(a => a.action === 'check' || a.action === 'call');
+            if (passiveActions.length >= 4) {
+                stats.passivePlays++;
+            }
+        }
+
+        function generatePlayerProfile(playerId) {
+            const stats = gameState.playerStats[playerId];
+            if (!stats || stats.handsPlayed === 0) {
+                return {
+                    style: 'Insufficiente',
+                    description: 'Dati insufficienti per generare un profilo',
+                    metrics: {}
+                };
+            }
+            
+            // Calcola metriche chiave
+            const totalActions = stats.totalRaises + stats.totalCalls + stats.totalChecks;
+            const raiseFreq = totalActions > 0 ? (stats.totalRaises / totalActions) * 100 : 0;
+            const foldFreq = stats.handsPlayed > 0 ? ((stats.foldPreFlop + stats.foldFlop + stats.foldTurn + stats.foldRiver) / stats.handsPlayed) * 100 : 0;
+            const aggressionRatio = totalActions > 0 ? stats.totalRaises / (stats.totalCalls + 1) : 0;
+            
+            // VPIP (Voluntarily Put money In Pot) - approssimato
+            const vpip = stats.handsPlayed > 0 ? 
+                ((stats.handsPlayed - stats.foldPreFlop) / stats.handsPlayed) * 100 : 0;
+            
+            // Stima tendenza bluff
+            const bluffTendency = estimateBluffTendency(stats, raiseFreq, vpip);
+            
+            // Determina stile di gioco
+            let style = '';
+            let description = '';
+            
+            if (aggressionRatio > 1.5 && vpip > 30) {
+                style = 'Aggressivo-Loose';
+                description = 'Gioca molte mani e punta frequentemente. Attenzione ai bluff!';
+            } else if (aggressionRatio > 1.5 && vpip <= 30) {
+                style = 'Aggressivo-Tight';
+                description = 'Selettivo nelle mani ma molto aggressivo quando entra. Giocatore pericoloso!';
+            } else if (aggressionRatio <= 1.5 && vpip > 30) {
+                style = 'Passivo-Loose';
+                description = 'Gioca molte mani ma raramente alza. Calling station.';
+            } else {
+                style = 'Passivo-Tight';
+                description = 'Gioca poche mani e raramente alza. Giocatore conservativo.';
+            }
+            
+            return {
+                style: style,
+                description: description,
+                metrics: {
+                    vpip: vpip.toFixed(1) + '%',
+                    raiseFrequency: raiseFreq.toFixed(1) + '%',
+                    foldFrequency: foldFreq.toFixed(1) + '%',
+                    aggressionRatio: aggressionRatio.toFixed(2),
+                    bluffTendency: bluffTendency,
+                    totalActions: totalActions,
+                    allInFreq: stats.handsPlayed > 0 ? ((stats.totalAllIns / stats.handsPlayed) * 100).toFixed(1) + '%' : '0%'
+                }
+            };
+        }
+
+        function estimateBluffTendency(stats, raiseFreq, vpip) {
+            // Stima basata su raise frequency, vpip e win rate
+            const winRate = stats.showdownParticipations > 0 ?
+                (stats.showdownWins / stats.showdownParticipations) * 100 : 50;
+            
+            let bluffScore = 0;
+            
+            // Alto raise frequency suggerisce possibili bluff
+            if (raiseFreq > 30) bluffScore += 2;
+            else if (raiseFreq > 20) bluffScore += 1;
+            
+            // Alto VPIP con basso win rate = possibili bluff
+            if (vpip > 40 && winRate < 40) bluffScore += 2;
+            
+            // All-in frequenti
+            const allinFreq = stats.handsPlayed > 0 ? (stats.totalAllIns / stats.handsPlayed) * 100 : 0;
+            if (allinFreq > 15) bluffScore += 1;
+            
+            if (bluffScore >= 4) return 'Alto';
+            if (bluffScore >= 2) return 'Medio';
+            return 'Basso';
+        }
+
+        function showPlayerProfiles() {
+            const container = document.getElementById('profilesContent');
+            container.innerHTML = '';
+            
+            gameState.players.forEach(player => {
+                const profile = generatePlayerProfile(player.id);
+                const stats = gameState.playerStats[player.id] || {};
+                
+                const profileCard = document.createElement('div');
+                profileCard.style.cssText = 'background: rgba(0, 0, 0, 0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 2px solid rgba(255, 215, 0, 0.3);';
+                
+                profileCard.innerHTML = `
+                    <div style="color: #ffd700; font-weight: bold; font-size: 18px; margin-bottom: 10px;">
+                        ${player.name}
+                    </div>
+                    <div style="background: rgba(156, 39, 176, 0.2); padding: 10px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #9C27B0;">
+                        <div style="color: #fff; font-weight: bold; margin-bottom: 5px;">Stile: ${profile.style}</div>
+                        <div style="color: #aaa; font-size: 14px;">${profile.description}</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px;">
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 4px;">
+                            <div style="color: #aaa;">VPIP</div>
+                            <div style="color: #ffd700; font-weight: bold;">${profile.metrics.vpip || 'N/A'}</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 4px;">
+                            <div style="color: #aaa;">Freq. Raise</div>
+                            <div style="color: #ffd700; font-weight: bold;">${profile.metrics.raiseFrequency || 'N/A'}</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 4px;">
+                            <div style="color: #aaa;">Freq. Fold</div>
+                            <div style="color: #ffd700; font-weight: bold;">${profile.metrics.foldFrequency || 'N/A'}</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 4px;">
+                            <div style="color: #aaa;">Aggression</div>
+                            <div style="color: #ffd700; font-weight: bold;">${profile.metrics.aggressionRatio || 'N/A'}</div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 4px;">
+                            <div style="color: #aaa;">Tend. Bluff</div>
+                            <div style="color: ${profile.metrics.bluffTendency === 'Alto' ? '#f44336' : profile.metrics.bluffTendency === 'Medio' ? '#FFC107' : '#4CAF50'}; font-weight: bold;">
+                                ${profile.metrics.bluffTendency || 'N/A'}
+                            </div>
+                        </div>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 8px; border-radius: 4px;">
+                            <div style="color: #aaa;">Freq. All-In</div>
+                            <div style="color: #ffd700; font-weight: bold;">${profile.metrics.allInFreq || 'N/A'}</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; padding: 8px; background: rgba(0, 0, 0, 0.2); border-radius: 4px; font-size: 12px; color: #888;">
+                        Azioni: ${profile.metrics.totalActions || 0} | Mani: ${stats.handsPlayed || 0}
+                    </div>
+                `;
+                
+                container.appendChild(profileCard);
+            });
+            
+            document.getElementById('profilesModal').classList.add('active');
+            hapticFeedback('light');
+        }
+
+        function closeProfilesModal() {
+            document.getElementById('profilesModal').classList.remove('active');
+        }
+
+        // ===== DEVELOPER TOOLS =====
+        let devActionCount = 0;
+
+        function devAutoPlay() {
+            if (!gameState.developerMode) return;
+            
+            // Fai agire tutti i giocatori automaticamente
+            const activePlayers = gameState.players.filter(p => !p.folded && p.chips > 0);
+            const maxBet = Math.max(...gameState.players.map(p => p.bet), 0);
+            
+            activePlayers.forEach(player => {
+                if (!player.hasActed || player.bet < maxBet) {
+                    const action = Math.random();
+                    
+                    if (action < 0.15 && activePlayers.length > 1) {
+                        // 15% fold (solo se non è l'ultimo)
+                        foldPlayer(player.id);
+                    } else {
+                        // 85% pareggia la puntata
+                        const callAmount = maxBet - player.bet;
+                        
+                        if (callAmount === 0) {
+                            // Può fare check
+                            checkPlayer(player.id);
+                        } else if (callAmount <= player.chips) {
+                            // Chiama
+                            player.chips -= callAmount;
+                            player.bet += callAmount;
+                            gameState.pot += callAmount;
+                            player.hasActed = true;
+                            gameState.history.push({
+                                type: 'bet',
+                                playerId: player.id,
+                                amount: callAmount,
+                                phase: gameState.phase
+                            });
+                            
+                            // Traccia call nelle statistiche
+                            if (gameState.playerStats[player.id]) {
+                                gameState.playerStats[player.id].totalCalls++;
+                                trackPlayerAction(player.id, 'call', callAmount);
+                            }
+                        } else {
+                            // All-in se non può pareggiare
+                            const allInAmount = player.chips;
+                            player.bet += allInAmount;
+                            gameState.pot += allInAmount;
+                            player.chips = 0;
+                            player.hasActed = true;
+                            gameState.history.push({
+                                type: 'allin',
+                                playerId: player.id,
+                                amount: allInAmount,
+                                phase: gameState.phase
+                            });
+                            
+                            if (gameState.playerStats[player.id]) {
+                                gameState.playerStats[player.id].totalAllIns++;
+                                trackPlayerAction(player.id, 'allin', allInAmount);
+                            }
+                        }
+                    }
+                    devActionCount++;
+                }
+            });
+            
+            renderGame();
+            checkPhaseReady();
+            saveGame();
+            updateDevStats();
+        }
+
+        let devSimulationRunning = false;
+
+        function devSimulateCustomHands() {
+            if (!gameState.developerMode) return;
+            if (devSimulationRunning) {
+                alert('⚠️ Simulazione già in corso! Usa Stop per fermarla.');
+                return;
+            }
+            
+            const handsToSimulate = parseInt(document.getElementById('devHandsCount').value);
+            
+            if (!handsToSimulate || handsToSimulate < 1 || handsToSimulate > 100) {
+                alert('❌ Inserisci un numero valido tra 1 e 100');
+                return;
+            }
+            
+            devSimulationRunning = true;
+            updateDevStatus(`Simulando ${handsToSimulate} mani...`);
+            
+            let handsSimulated = 0;
+            
+            const simulateOneHand = () => {
+                if (!devSimulationRunning || handsSimulated >= handsToSimulate) {
+                    devSimulationRunning = false;
+                    updateDevStatus('Completato ✅');
+                    alert(`✅ Simulazione completata! ${handsSimulated} mani giocate.`);
+                    return;
+                }
+                
+                updateDevStatus(`Mano ${handsSimulated + 1}/${handsToSimulate}`);
+                
+                // Simula tutte le fasi della mano
+                const phases = ['Pre-Flop', 'Flop', 'Turn', 'River', 'Showdown'];
+                let currentPhaseIndex = 0;
+                
+                const simulatePhase = () => {
+                    if (!devSimulationRunning) return;
+                    
+                    // Auto play fino a che tutti hanno pareggiato
+                    let maxIterations = 20; // Protezione loop infinito
+                    let iterations = 0;
+                    
+                    while (iterations < maxIterations) {
+                        const activePlayers = gameState.players.filter(p => !p.folded && p.chips > 0);
+                        if (activePlayers.length === 0) break;
+                        
+                        const allNonFolded = gameState.players.filter(p => !p.folded);
+                        const maxBet = Math.max(...allNonFolded.map(p => p.bet), 0);
+                        const allActed = activePlayers.every(p => p.hasActed);
+                        const allMatched = activePlayers.every(p => p.bet === maxBet);
+                        
+                        if (allActed && allMatched) {
+                            // Fase completa, passa alla prossima
+                            break;
+                        }
+                        
+                        // Fai agire i giocatori che non hanno ancora agito o non hanno pareggiato
+                        activePlayers.forEach(player => {
+                            if (!player.hasActed || player.bet < maxBet) {
+                                const shouldFold = Math.random() < 0.15 && activePlayers.length > 1;
+                                
+                                if (shouldFold) {
+                                    player.folded = true;
+                                    player.hasActed = true;
+                                    if (gameState.playerStats[player.id]) {
+                                        if (gameState.phase === 'Pre-Flop') gameState.playerStats[player.id].foldPreFlop++;
+                                        else if (gameState.phase === 'Flop') gameState.playerStats[player.id].foldFlop++;
+                                        else if (gameState.phase === 'Turn') gameState.playerStats[player.id].foldTurn++;
+                                        else if (gameState.phase === 'River') gameState.playerStats[player.id].foldRiver++;
+                                    }
+                                } else {
+                                    const callAmount = maxBet - player.bet;
+                                    
+                                    if (callAmount === 0) {
+                                        player.hasActed = true;
+                                        player.hasChecked = true;
+                                        if (gameState.playerStats[player.id]) {
+                                            gameState.playerStats[player.id].totalChecks++;
+                                        }
+                                    } else if (callAmount <= player.chips) {
+                                        player.chips -= callAmount;
+                                        player.bet += callAmount;
+                                        gameState.pot += callAmount;
+                                        player.hasActed = true;
+                                        if (gameState.playerStats[player.id]) {
+                                            gameState.playerStats[player.id].totalCalls++;
+                                        }
+                                    } else {
+                                        // All-in
+                                        const allInAmount = player.chips;
+                                        player.bet += allInAmount;
+                                        gameState.pot += allInAmount;
+                                        player.chips = 0;
+                                        player.hasActed = true;
+                                        if (gameState.playerStats[player.id]) {
+                                            gameState.playerStats[player.id].totalAllIns++;
+                                        }
+                                    }
+                                }
+                                devActionCount++;
+                            }
+                        });
+                        
+                        iterations++;
+                    }
+                    
+                    // Passa alla fase successiva o concludi mano
+                    currentPhaseIndex++;
+                    
+                    if (currentPhaseIndex >= phases.length) {
+                        // Showdown raggiunto, assegna vincitore
+                        const nonFolded = gameState.players.filter(p => !p.folded);
+                        if (nonFolded.length > 0) {
+                            const winner = nonFolded[Math.floor(Math.random() * nonFolded.length)];
+                            winner.chips += gameState.pot;
+                            
+                            // Traccia showdown
+                            if (gameState.phase === 'Showdown') {
+                                if (gameState.playerStats[winner.id]) {
+                                    gameState.playerStats[winner.id].showdownWins++;
+                                }
+                                nonFolded.forEach(p => {
+                                    if (gameState.playerStats[p.id]) {
+                                        gameState.playerStats[p.id].showdownParticipations++;
+                                    }
+                                });
+                            }
+                        }
+                        
+                        // Reset per nuova mano
+                        gameState.dealerIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+                        gameState.players.forEach(p => {
+                            p.bet = 0;
+                            p.folded = false;
+                            p.hasActed = false;
+                            p.hasChecked = false;
+                        });
+                        gameState.pot = 0;
+                        gameState.phase = 'Pre-Flop';
+                        gameState.currentCall = 0;
+                        gameState.handCount++;
+                        
+                        // Incrementa handsPlayed
+                        gameState.players.forEach(p => {
+                            if (gameState.playerStats[p.id]) {
+                                gameState.playerStats[p.id].handsPlayed++;
+                            }
+                        });
+                        
+                        // Applica blinds/ante
+                        if (gameState.blindMode === 'ante' && gameState.anteAmount > 0) {
+                            gameState.players.forEach(player => {
+                                if (player.chips >= gameState.anteAmount) {
+                                    player.chips -= gameState.anteAmount;
+                                    player.bet = gameState.anteAmount;
+                                    gameState.pot += gameState.anteAmount;
+                                }
+                            });
+                            gameState.currentCall = gameState.anteAmount;
+                        } else if (gameState.blindMode === 'blinds') {
+                            const sbIndex = (gameState.dealerIndex + 1) % gameState.players.length;
+                            const bbIndex = (gameState.dealerIndex + 2) % gameState.players.length;
+                            const sbPlayer = gameState.players[sbIndex];
+                            const bbPlayer = gameState.players[bbIndex];
+                            
+                            if (sbPlayer.chips >= gameState.smallBlind) {
+                                sbPlayer.chips -= gameState.smallBlind;
+                                sbPlayer.bet = gameState.smallBlind;
+                                gameState.pot += gameState.smallBlind;
+                            }
+                            if (bbPlayer.chips >= gameState.bigBlind) {
+                                bbPlayer.chips -= gameState.bigBlind;
+                                bbPlayer.bet = gameState.bigBlind;
+                                gameState.pot += gameState.bigBlind;
+                            }
+                            gameState.currentCall = gameState.bigBlind;
+                        }
+                        
+                        saveStackSnapshot();
+                        handsSimulated++;
+                        
+                        renderGame();
+                        updateDevStats();
+                        saveGame();
+                        
+                        // Continua con la prossima mano
+                        setTimeout(() => simulateOneHand(), 50);
+                    } else {
+                        // Passa alla prossima fase
+                        gameState.phase = phases[currentPhaseIndex];
+                        gameState.players.forEach(p => {
+                            p.hasActed = false;
+                            p.bet = 0;
+                            p.hasChecked = false;
+                        });
+                        gameState.currentCall = 0;
+                        
+                        renderGame();
+                        updateDevStats();
+                        
+                        // Continua simulazione fase
+                        setTimeout(() => simulatePhase(), 30);
+                    }
+                };
+                
+                simulatePhase();
+            };
+            
+            simulateOneHand();
+        }
+
+        function devStopSimulation() {
+            if (devSimulationRunning) {
+                devSimulationRunning = false;
+                updateDevStatus('Fermato ⏹️');
+                alert('⏹️ Simulazione fermata.');
+            } else {
+                alert('ℹ️ Nessuna simulazione in corso.');
+            }
+        }
+
+        function updateDevStatus(status) {
+            const statusEl = document.getElementById('devStatus');
+            if (statusEl) {
+                statusEl.textContent = status;
+            }
+        }
+
+        function devRandomWinner() {
+            if (!gameState.developerMode) return;
+            
+            const nonFolded = gameState.players.filter(p => !p.folded);
+            if (nonFolded.length > 0) {
+                const winner = nonFolded[Math.floor(Math.random() * nonFolded.length)];
+                assignPot(winner.id);
+            }
+        }
+
+        function devFillStats() {
+            if (!gameState.developerMode) return;
+            
+            // Riempi statistiche con dati casuali per testare i profili
+            gameState.players.forEach(player => {
+                const stats = gameState.playerStats[player.id];
+                if (stats) {
+                    stats.handsPlayed = 20 + Math.floor(Math.random() * 30);
+                    stats.foldPreFlop = Math.floor(stats.handsPlayed * (0.1 + Math.random() * 0.3));
+                    stats.totalRaises = Math.floor(stats.handsPlayed * (0.2 + Math.random() * 0.4));
+                    stats.totalCalls = Math.floor(stats.handsPlayed * (0.3 + Math.random() * 0.3));
+                    stats.totalChecks = Math.floor(stats.handsPlayed * (0.2 + Math.random() * 0.3));
+                    stats.totalAllIns = Math.floor(Math.random() * 5);
+                    stats.showdownWins = Math.floor(Math.random() * 10);
+                    stats.showdownParticipations = stats.showdownWins + Math.floor(Math.random() * 10);
+                }
+            });
+            
+            alert('Statistiche riempite con dati casuali!');
+            saveGame();
+        }
+
+        function devAddChips() {
+            if (!gameState.developerMode) return;
+            
+            gameState.players.forEach(player => {
+                player.chips += 1000;
+            });
+            
+            renderGame();
+            saveGame();
+        }
+
+        function devNextPhaseForce() {
+            if (!gameState.developerMode) return;
+            
+            // Forza tutti ad aver agito
+            gameState.players.forEach(p => {
+                p.hasActed = true;
+                if (!p.folded && p.chips > 0) {
+                    const maxBet = Math.max(...gameState.players.map(pl => pl.bet));
+                    p.bet = maxBet;
+                }
+            });
+            
+            nextPhase();
+        }
+
+        function updateDevStats() {
+            if (!gameState.developerMode) return;
+            
+            document.getElementById('devHandCount').textContent = gameState.handCount;
+            document.getElementById('devActionCount').textContent = devActionCount;
+        }
+
+        function showDevTools() {
+            if (gameState.developerMode) {
+                document.getElementById('devTools').style.display = 'block';
+                updateDevStats();
+            } else {
+                document.getElementById('devTools').style.display = 'none';
+            }
         }
 
         function saveStackSnapshot() {
@@ -2738,6 +3391,19 @@
             gameState.pot += amount;
             player.hasActed = true;
 
+            // Traccia pattern - Raise
+            const isRaise = player.bet > gameState.currentCall;
+            if (gameState.playerStats[currentBetPlayer] && isRaise) {
+                gameState.playerStats[currentBetPlayer].totalRaises++;
+                if (gameState.phase === 'Pre-Flop') gameState.playerStats[currentBetPlayer].raisePreFlop++;
+                else if (gameState.phase === 'Flop') gameState.playerStats[currentBetPlayer].raiseFlop++;
+                else if (gameState.phase === 'Turn') gameState.playerStats[currentBetPlayer].raiseTurn++;
+                else if (gameState.phase === 'River') gameState.playerStats[currentBetPlayer].raiseRiver++;
+                
+                // Traccia azione
+                trackPlayerAction(currentBetPlayer, 'raise', amount);
+            }
+
             // Log
             addLog(`${player.name} punta ${amount}`, 'bet');
 
@@ -2798,6 +3464,12 @@
             gameState.pot += amount;
             player.chips = 0;
             player.hasActed = true;
+
+            // Traccia pattern - All-In
+            if (gameState.playerStats[currentAllinPlayer]) {
+                gameState.playerStats[currentAllinPlayer].totalAllIns++;
+                trackPlayerAction(currentAllinPlayer, 'allin', amount);
+            }
 
             // Log
             addLog(`${player.name} va All-In con ${amount}!`, 'bet');
@@ -2920,6 +3592,12 @@
             player.hasActed = true;
             player.hasChecked = true;
 
+            // Traccia pattern - Check
+            if (gameState.playerStats[playerId]) {
+                gameState.playerStats[playerId].totalChecks++;
+                trackPlayerAction(playerId, 'check', 0);
+            }
+
             // Log
             addLog(`${player.name} fa check`, 'check');
 
@@ -2965,6 +3643,12 @@
             player.bet += callAmount;
             gameState.pot += callAmount;
             player.hasActed = true;
+
+            // Traccia pattern - Call
+            if (gameState.playerStats[playerId]) {
+                gameState.playerStats[playerId].totalCalls++;
+                trackPlayerAction(playerId, 'call', callAmount);
+            }
 
             // Log
             addLog(`${player.name} chiama ${callAmount}`, 'bet');
