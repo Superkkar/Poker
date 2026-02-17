@@ -1270,18 +1270,23 @@
             </p>
 
             <div class="setup-group">
-                <label for="numPlayers">Numero di giocatori</label>
-                <select id="numPlayers">
-                    <option value="2">2 giocatori</option>
-                    <option value="3">3 giocatori</option>
-                    <option value="4">4 giocatori</option>
-                    <option value="5">5 giocatori</option>
-                    <option value="6" selected>6 giocatori</option>
-                    <option value="7">7 giocatori</option>
-                    <option value="8">8 giocatori</option>
-                    <option value="9">9 giocatori</option>
-                    <option value="10">10 giocatori</option>
-                </select>
+                <label for="numPlayers">Numero di giocatori (2 - illimitato)</label>
+                <div style="display:flex; gap:10px; align-items:center;">
+                    <input type="number" id="numPlayers" value="6" min="2" step="1"
+                           style="flex:1; padding:10px; border:2px solid #ffd700; border-radius:8px;
+                                  background:rgba(255,255,255,0.1); color:#fff; font-size:16px;"
+                           onchange="updatePlayerInputs()">
+                    <div style="display:flex; flex-direction:column; gap:4px;">
+                        <button type="button" onclick="changePlayerCount(1)"
+                            style="width:36px; height:28px; background:#ffd700; border:none;
+                                   border-radius:5px; font-size:18px; font-weight:bold;
+                                   cursor:pointer; line-height:1;">+</button>
+                        <button type="button" onclick="changePlayerCount(-1)"
+                            style="width:36px; height:28px; background:#ffd700; border:none;
+                                   border-radius:5px; font-size:18px; font-weight:bold;
+                                   cursor:pointer; line-height:1;">−</button>
+                    </div>
+                </div>
             </div>
 
             <div class="setup-group">
@@ -1512,18 +1517,24 @@
                 </div>
 
                 <div class="setting-item">
-                    <label class="setting-label">Numero giocatori</label>
-                    <select id="settingsNumPlayers" style="width: 100%; padding: 10px; border: 2px solid #ffd700; border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: #fff; font-size: 16px;">
-                        <option value="2">2 giocatori</option>
-                        <option value="3">3 giocatori</option>
-                        <option value="4">4 giocatori</option>
-                        <option value="5">5 giocatori</option>
-                        <option value="6">6 giocatori</option>
-                        <option value="7">7 giocatori</option>
-                        <option value="8">8 giocatori</option>
-                        <option value="9">9 giocatori</option>
-                        <option value="10">10 giocatori</option>
-                    </select>
+                    <label class="setting-label">Numero giocatori (2 - illimitato)</label>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <input type="number" id="settingsNumPlayers" min="2" step="1"
+                               style="flex:1; width:100%; padding:10px; border:2px solid #ffd700;
+                                      border-radius:6px; background:rgba(255,255,255,0.1);
+                                      color:#fff; font-size:16px;"
+                               onchange="updateSettingsPlayerInputs()">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            <button type="button" onclick="changeSettingsPlayerCount(1)"
+                                style="width:36px; height:28px; background:#ffd700; border:none;
+                                       border-radius:5px; font-size:18px; font-weight:bold;
+                                       cursor:pointer; line-height:1;">+</button>
+                            <button type="button" onclick="changeSettingsPlayerCount(-1)"
+                                style="width:36px; height:28px; background:#ffd700; border:none;
+                                       border-radius:5px; font-size:18px; font-weight:bold;
+                                       cursor:pointer; line-height:1;">−</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="settingsPlayerInputs"></div>
@@ -1716,6 +1727,10 @@
             updatePlayerInputs();
             updateTablePreview();
         });
+        document.getElementById('numPlayers').addEventListener('input', () => {
+            const v = parseInt(document.getElementById('numPlayers').value);
+            if (!isNaN(v) && v >= 2) { updatePlayerInputs(); updateTablePreview(); }
+        });
 
         function toggleChipsMode() {
             const sameForAll = document.getElementById('sameChipsForAll').checked;
@@ -1751,8 +1766,26 @@
             }
         }
 
+        function changePlayerCount(delta) {
+            const input = document.getElementById('numPlayers');
+            const current = parseInt(input.value) || 6;
+            const next = Math.max(2, current + delta);
+            input.value = next;
+            updatePlayerInputs();
+        }
+
+        function changeSettingsPlayerCount(delta) {
+            const input = document.getElementById('settingsNumPlayers');
+            const current = parseInt(input.value) || 6;
+            const next = Math.max(2, current + delta);
+            input.value = next;
+            updateSettingsPlayerInputs();
+        }
+
         function updatePlayerInputs() {
-            const num = parseInt(document.getElementById('numPlayers').value);
+            const raw = parseInt(document.getElementById('numPlayers').value);
+            const num = isNaN(raw) || raw < 2 ? 2 : raw;
+            document.getElementById('numPlayers').value = num;
             const sameForAll = document.getElementById('sameChipsForAll').checked;
             const container = document.getElementById('playerInputs');
             container.innerHTML = '';
@@ -1784,7 +1817,7 @@
         }
 
         function updateDealerSelect() {
-            const num = parseInt(document.getElementById('numPlayers').value);
+            const num = parseInt(document.getElementById('numPlayers').value) || 6;
             const dealerSelect = document.getElementById('initialDealer');
             const currentValue = dealerSelect.value;
             
@@ -1806,27 +1839,15 @@
         }
 
         function updateTablePreview() {
-            const num = parseInt(document.getElementById('numPlayers').value);
+            const num = parseInt(document.getElementById('numPlayers').value) || 6;
             const table = document.getElementById('previewTable');
             
             // Rimuovi giocatori esistenti (mantieni solo il dealer chip)
             const existingPlayers = table.querySelectorAll('.table-player');
             existingPlayers.forEach(p => p.remove());
             
-            // Posizioni per ogni numero di giocatori (in gradi)
-            const positions = {
-                2: [0, 180],
-                3: [0, 120, 240],
-                4: [0, 90, 180, 270],
-                5: [0, 72, 144, 216, 288],
-                6: [0, 60, 120, 180, 240, 300],
-                7: [0, 51.4, 102.8, 154.2, 205.6, 257, 308.4],
-                8: [0, 45, 90, 135, 180, 225, 270, 315],
-                9: [0, 40, 80, 120, 160, 200, 240, 280, 320],
-                10: [0, 36, 72, 108, 144, 180, 216, 252, 288, 324]
-            };
-            
-            const angles = positions[num] || positions[6];
+            // Calcola posizioni angolari in modo dinamico per qualsiasi numero
+            const angles = Array.from({length: num}, (_, i) => (360 / num) * i);
             
             for (let i = 0; i < num; i++) {
                 const nameInput = document.getElementById(`playerName${i}`);
@@ -1852,7 +1873,9 @@
         }
 
         function startGame() {
-            const numPlayers = parseInt(document.getElementById('numPlayers').value);
+            const rawNum = parseInt(document.getElementById('numPlayers').value);
+            const numPlayers = isNaN(rawNum) || rawNum < 2 ? 2 : rawNum;
+            document.getElementById('numPlayers').value = numPlayers;
             const sameForAll = document.getElementById('sameChipsForAll').checked;
             const globalChips = parseInt(document.getElementById('startingChips').value);
             const chipValue = parseInt(document.getElementById('chipValue').value) || 0;
@@ -4196,11 +4219,21 @@
             }
         }
 
-        document.getElementById('settingsNumPlayers').addEventListener('change', updateSettingsPlayerInputs);
+        document.getElementById('settingsNumPlayers').addEventListener('change', () => {
+            const v = parseInt(document.getElementById('settingsNumPlayers').value);
+            if (isNaN(v) || v < 2) document.getElementById('settingsNumPlayers').value = 2;
+            updateSettingsPlayerInputs();
+        });
+        document.getElementById('settingsNumPlayers').addEventListener('input', () => {
+            const v = parseInt(document.getElementById('settingsNumPlayers').value);
+            if (!isNaN(v) && v >= 2) updateSettingsPlayerInputs();
+        });
 
         function applySettings() {
             const newAnte = parseInt(document.getElementById('settingsAnte').value);
-            const newNum = parseInt(document.getElementById('settingsNumPlayers').value);
+            const rawNewNum = parseInt(document.getElementById('settingsNumPlayers').value);
+            const newNum = isNaN(rawNewNum) || rawNewNum < 2 ? 2 : rawNewNum;
+            document.getElementById('settingsNumPlayers').value = newNum;
             const newChipValue = parseInt(document.getElementById('settingsChipValue').value) || 0;
             
             gameState.anteAmount = newAnte;
